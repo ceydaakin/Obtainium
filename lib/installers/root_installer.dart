@@ -8,7 +8,14 @@ import 'package:obtainium/providers/source_provider.dart';
 
 /// Installs via the Android `pm` CLI over root (`su`).
 class RootInstaller extends Installer {
-  RootInstaller(super.settingsProvider);
+  static const int _androidApiLevelU = 34;
+
+  RootInstaller(
+    super.settingsProvider, {
+    Future<ProcessResult> Function(String cmd)? runAsRoot,
+  }) : _runAsRoot = runAsRoot ?? _runWithSu;
+
+  final Future<ProcessResult> Function(String cmd) _runAsRoot;
 
   @override
   String get modeKey => 'root';
@@ -56,13 +63,15 @@ class RootInstaller extends Installer {
       final installerPackageName =
           installOptions['installerPackageName'] as String? ?? '';
       final installLine = installerPackageName.isNotEmpty
-          ? 'pm install -r -i ${_quoteShell(installerPackageName)} --user "\$uid" $stagedApks'
-          : 'pm install -r --user "\$uid" $stagedApks';
+          ? 'pm install -r \$bypass -i ${_quoteShell(installerPackageName)} --user "\$uid" $stagedApks'
+          : 'pm install -r \$bypass --user "\$uid" $stagedApks';
       final script = [
         'd="\$(mktemp -d /data/local/tmp/obtainium.XXXXXX)" || exit 1',
         'trap \'rm -rf "\$d"\' EXIT',
         stagedCopies,
         'uid="\$(am get-current-user 2>/dev/null)"; uid="\${uid:-0}"',
+        'sdk="\$(getprop ro.build.version.sdk 2>/dev/null)"; bypass=""',
+        '[ "\${sdk:-0}" -ge $_androidApiLevelU ] 2>/dev/null && bypass="--bypass-low-target-sdk-block"',
         installLine,
       ].join('\n');
       final result = await _runAsRoot(script);
@@ -81,7 +90,7 @@ class RootInstaller extends Installer {
     }
   }
 
-  Future<ProcessResult> _runAsRoot(String cmd) =>
+  static Future<ProcessResult> _runWithSu(String cmd) =>
       Process.run('su', ['-c', cmd]);
 
   static String _quoteShell(String path) =>
