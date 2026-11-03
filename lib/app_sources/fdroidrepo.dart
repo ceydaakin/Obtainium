@@ -63,6 +63,10 @@ class _FdroidIndex {
 }
 
 class FDroidRepo extends AppSource {
+  static const _indexCacheDuration = Duration(minutes: 10);
+  final Map<String, ({Future<_FdroidIndex> index, DateTime at})> _indexCache =
+      {};
+
   @override
   String get name => tr('fdroidThirdPartyRepo');
 
@@ -226,6 +230,26 @@ class FDroidRepo extends AppSource {
   /// one that lists every architecture — see #3249); falls back to the legacy
   /// `index.xml` format otherwise.
   Future<_FdroidIndex> _fetchIndex(
+    String url,
+    Map<String, dynamic> additionalSettings,
+  ) {
+    final cached = _indexCache[url];
+    if (cached != null &&
+        DateTime.now().difference(cached.at) < _indexCacheDuration) {
+      return cached.index;
+    }
+    final index = _downloadIndex(url, additionalSettings);
+    _indexCache[url] = (index: index, at: DateTime.now());
+    index.then<void>(
+      (_) {},
+      onError: (Object _) {
+        if (identical(_indexCache[url]?.index, index)) _indexCache.remove(url);
+      },
+    );
+    return index;
+  }
+
+  Future<_FdroidIndex> _downloadIndex(
     String url,
     Map<String, dynamic> additionalSettings,
   ) async {
