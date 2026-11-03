@@ -755,6 +755,30 @@ Directory? selectPrimaryExternalCache(
   return null;
 }
 
+Future<({Directory apkDir, Directory iconsCacheDir})> prepareCacheDirs(
+  Directory? externalRoot,
+  Future<Directory> Function() internalCache,
+) async {
+  if (externalRoot != null) {
+    try {
+      final iconsCacheDir = Directory('${externalRoot.path}/icons');
+      iconsCacheDir.createSync(recursive: true);
+      return (apkDir: externalRoot, iconsCacheDir: iconsCacheDir);
+    } on FileSystemException catch (e) {
+      AppLogger.warn(
+        'External cache unavailable, using internal cache',
+        error: e,
+      );
+    }
+  }
+  final internal = await internalCache();
+  final apkDir = Directory('${internal.path}/apks')
+    ..createSync(recursive: true);
+  final iconsCacheDir = Directory('${internal.path}/icons')
+    ..createSync(recursive: true);
+  return (apkDir: apkDir, iconsCacheDir: iconsCacheDir);
+}
+
 class AppsProvider with ChangeNotifier {
   // Static, app-lifetime cross-instance save-notification bus; intentionally
   // never closed. The foreground instance subscribes so it can detect saves
@@ -927,20 +951,12 @@ class AppsProvider with ChangeNotifier {
           await getExternalStorageDirectory(),
         );
       } catch (_) {}
-      if (cacheRoot == null) {
-        final internalCache = await getApplicationCacheDirectory();
-        _apkDir = Directory('${internalCache.path}/apks');
-        _iconsCacheDir = Directory('${internalCache.path}/icons');
-      } else {
-        _apkDir = cacheRoot;
-        _iconsCacheDir = Directory('${cacheRoot.path}/icons');
-      }
-      if (!_apkDir!.existsSync()) {
-        _apkDir!.createSync(recursive: true);
-      }
-      if (!_iconsCacheDir!.existsSync()) {
-        _iconsCacheDir!.createSync(recursive: true);
-      }
+      final cacheDirs = await prepareCacheDirs(
+        cacheRoot,
+        getApplicationCacheDirectory,
+      );
+      _apkDir = cacheDirs.apkDir;
+      _iconsCacheDir = cacheDirs.iconsCacheDir;
       if (!isBg) {
         loadingApps = true;
         notify();
