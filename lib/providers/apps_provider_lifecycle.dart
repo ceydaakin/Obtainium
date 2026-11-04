@@ -26,6 +26,15 @@ const _corruptFileSuffix = '.corrupt';
 /// target the same app.
 int _saveTempCounter = 0;
 
+Future<void> replaceFileContents(
+  String filePath,
+  String tmpPath,
+  String contents,
+) async {
+  await File(tmpPath).writeAsString(contents, flush: true);
+  await File(tmpPath).rename(filePath);
+}
+
 /// Whether a cached app icon can be reused instead of re-reading it from the
 /// platform.
 ///
@@ -161,8 +170,7 @@ extension AppsProviderLifecycle on AppsProvider {
       // interleave writes or race each other's rename. #2089
       final String tmpPath =
           '$filePath.${DateTime.now().microsecondsSinceEpoch}-${_saveTempCounter++}.tmp';
-      await File(tmpPath).writeAsString(jsonEncode(app.toJson()));
-      await File(tmpPath).rename(filePath);
+      await replaceFileContents(filePath, tmpPath, jsonEncode(app.toJson()));
     }
 
     try {
