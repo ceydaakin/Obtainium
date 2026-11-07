@@ -356,8 +356,15 @@ class GitHub extends AppSource {
     return reqUrl;
   }
 
-  Future<String> getAPIHost(Map<String, dynamic> additionalSettings) async =>
-      'https://api.${hosts[0]}';
+  Future<String> getAPIHost(Map<String, dynamic> additionalSettings) async {
+    final host = hosts[0];
+    if (!hostChanged ||
+        hostIdenticalDespiteAnyChange ||
+        host.endsWith('.ghe.com')) {
+      return 'https://api.$host';
+    }
+    return 'https://$host/api/v3';
+  }
 
   /// Whether [res] is a 401/403 whose JSON body says the configured token is
   /// the problem (e.g. "Resource not accessible by personal access token").
