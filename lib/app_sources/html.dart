@@ -33,16 +33,24 @@ List<String> collectAllStringsFromJSONObject(dynamic obj) {
   return extractor(obj);
 }
 
+String _trimTrailingUrlPunctuation(String url) {
+  while (true) {
+    // Punctuation usually belongs to the surrounding text/code
+    // rather than to the URL itself.
+    url = url.replaceFirst(RegExp(r'[.,;:!?]+$'), '');
+    if (url.endsWith(')') &&
+        ')'.allMatches(url).length > '('.allMatches(url).length) {
+      url = url.substring(0, url.length - 1);
+    } else {
+      return url;
+    }
+  }
+}
+
 List<MapEntry<String, String>> getLinksInLines(String lines) =>
-    RegExp(r'''(?:(?:http|https|ftp)://)[^\s"'<>()\[\]{}]+''')
+    RegExp(r'''(?:(?:http|https|ftp)://)[^\s"'<>\[\]{}]+''')
         .allMatches(lines)
-        .map(
-          (match) => match
-              .group(0)!
-              // Punctuation usually belongs to the surrounding text/code
-              // rather than to the URL itself.
-              .replaceFirst(RegExp(r'[.,;:!?]+$'), ''),
-        )
+        .map((match) => _trimTrailingUrlPunctuation(match.group(0)!))
         .where((url) => url.isNotEmpty)
         .map((url) => MapEntry(url, url.split('/').last))
         .toList();
