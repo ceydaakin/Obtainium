@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:obtainium/custom_errors.dart';
 import 'package:obtainium/models/app.dart';
 import 'package:obtainium/utils/min_update_age.dart';
 
@@ -69,7 +70,7 @@ void main() {
           MapEntry('new.apk', 'https://example.com/0.12.8/new.apk'),
         ],
       );
-      final result = applyMinAgeSuppression(current, fetched);
+      final result = applyMinAgeSuppression(current, fetched, 14);
       expect(result.latestVersion, '0.12.6');
       expect(result.releaseDate, DateTime(2026, 8, 28));
       expect(result.changeLog, 'old');
@@ -78,6 +79,28 @@ void main() {
       expect(result.apkUrls.single.value, 'https://example.com/0.12.6/old.apk');
       // Non-release metadata still comes from the fetch.
       expect(result.name, fetched.name);
+    });
+
+    test('throws instead of keeping a placeholder APK URL', () {
+      final current = _app(
+        latestVersion: 'unknown',
+        apkUrls: const [MapEntry('placeholder', 'placeholder')],
+      );
+      final fetched = _app(
+        latestVersion: '0.12.8',
+        releaseDate: DateTime(2026, 9, 7),
+        apkUrls: const [
+          MapEntry('new.apk', 'https://example.com/0.12.8/new.apk'),
+        ],
+      );
+      expect(
+        () => applyMinAgeSuppression(current, fetched, 30),
+        throwsA(
+          isA<MinUpdateAgeError>()
+              .having((e) => e.code, 'code', 'MIN_UPDATE_AGE')
+              .having((e) => e.data['minAgeDays'], 'minAgeDays', 30),
+        ),
+      );
     });
   });
 }

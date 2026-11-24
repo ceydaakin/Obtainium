@@ -4,6 +4,7 @@
 // (supply-chain delay); sources that cannot look back rely on the fetch
 // suppression below and on the add-time check in [SourceProvider.getApp].
 
+import 'package:obtainium/custom_errors.dart';
 import 'package:obtainium/models/app.dart';
 import 'package:obtainium/providers/settings_provider.dart';
 
@@ -36,7 +37,12 @@ bool isReleaseTooYoung(DateTime? releaseDate, int minAgeDays, {DateTime? now}) {
 /// the update stays suppressed until the fetched release is old enough. The
 /// APK URLs must move with the version, otherwise an update made during the
 /// suppression window would silently download the fresh release.
-App applyMinAgeSuppression(App currentApp, App fetchedApp) {
+App applyMinAgeSuppression(App currentApp, App fetchedApp, int minAgeDays) {
+  if (currentApp.apkUrls.isNotEmpty &&
+      currentApp.apkUrls.first.value == 'placeholder') {
+    throw MinUpdateAgeError(fetchedApp.releaseDate!, minAgeDays)
+      ..url = fetchedApp.url;
+  }
   return fetchedApp.copyWith(
     latestVersion: currentApp.latestVersion,
     releaseDate: currentApp.releaseDate,

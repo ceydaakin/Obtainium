@@ -57,10 +57,11 @@ extension AppsProviderUpdates on AppsProvider {
       currentApp.additionalSettings,
       currentApp: currentApp,
     );
-    if (await _isReleaseYoungerThanMinAge(currentApp, newApp)) {
+    final minAgeDays = await _minAgeDaysIfReleaseTooYoung(currentApp, newApp);
+    if (minAgeDays != null) {
       // Suppress the update until the release has reached the configured
       // minimum age (supply-chain delay).
-      newApp = applyMinAgeSuppression(currentApp, newApp);
+      newApp = applyMinAgeSuppression(currentApp, newApp, minAgeDays);
     }
     if (currentApp.preferredApkIndex < newApp.apkUrls.length) {
       newApp = newApp.copyWith(preferredApkIndex: currentApp.preferredApkIndex);
@@ -98,17 +99,19 @@ extension AppsProviderUpdates on AppsProvider {
     }
   }
 
-  /// Returns true when [newApp]'s release is newer than the configured
-  /// minimum update age and should therefore be suppressed.
-  Future<bool> _isReleaseYoungerThanMinAge(App currentApp, App newApp) async {
+  /// Returns the configured minimum update age when [newApp]'s release is
+  /// younger than it and should therefore be suppressed, otherwise null.
+  Future<int?> _minAgeDaysIfReleaseTooYoung(App currentApp, App newApp) async {
     if (newApp.latestVersion == currentApp.latestVersion) {
-      return false;
+      return null;
     }
     final minAgeDays = await effectiveMinUpdateAgeDays(
       currentApp.additionalSettings,
       settingsProvider: settingsProvider,
     );
-    return isReleaseTooYoung(newApp.releaseDate, minAgeDays);
+    return isReleaseTooYoung(newApp.releaseDate, minAgeDays)
+        ? minAgeDays
+        : null;
   }
 
   Future<App?> checkUpdate(String appId) async {
