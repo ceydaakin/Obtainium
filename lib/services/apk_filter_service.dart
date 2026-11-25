@@ -85,6 +85,17 @@ class ApkFilterService {
     return RegExp('.*(?:${variants.join('|')}).*', caseSensitive: false);
   }
 
+  static const List<String> knownAbis = [
+    'arm64-v8a',
+    'armeabi-v7a',
+    'x86',
+    'x86_64',
+  ];
+
+  static bool isUniversalApkName(String name) =>
+      name.toLowerCase().contains('universal') &&
+      !knownAbis.any((abi) => _abiRegex(abi).hasMatch(name));
+
   Future<List<MapEntry<String, String>>> filterApksByArch(
     List<MapEntry<String, String>> apkUrls,
     List<String> abis,
@@ -101,7 +112,7 @@ class ApkFilterService {
           // ABI-specific match stays last and remains the default selection.
           final universal = apkUrls.where(
             (element) =>
-                element.key.toLowerCase().contains('universal') &&
+                isUniversalApkName(element.key) &&
                 !urls2.any((match) => match.value == element.value),
           );
           apkUrls = [...universal, ...urls2];
